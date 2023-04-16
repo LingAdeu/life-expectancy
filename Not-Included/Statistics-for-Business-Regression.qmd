@@ -1,0 +1,100 @@
+---
+title: "Statistics-for-Business-Regression"
+author: "Adelia Januarto"
+output-file: html
+---
+
+
+# Introduction
+
+# Dataset 1
+
+```{r, warning=F, message=F}
+library(tidyverse)
+```
+
+The happiness world report dataset was taken from [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Heart+failure+clinical+records).
+
+```{r}
+# import dataset
+df <- 
+  read_csv("datasets/heart_failure_clinical_records.csv", 
+           show_col_types = F)
+
+# display top-10 rows
+df[1:10,]
+```
+
+Description:
+- `age`: the patient's age (in years)
+- `anemia`: anemia status
+- `high_blood_pressure`: hypertension status
+- `creatinine_phosphokinase`: level of CPK enzyme in blood (mcg/L)
+- `diabetes`: diabetes status
+- `ejection_fraction`
+- `platelets`
+- `sex`
+- `creatinine_phosphokinase`
+- `serum sodium`
+- `smoking`
+- `death_event`
+
+# Dataset 2
+Source: https://www.kaggle.com/datasets/kumarajarshi/life-expectancy-who
+```{r}
+# import dataset
+df_2 <- 
+  read_csv("datasets/life-expectancy.csv",
+           show_col_types = F)
+
+# show top rows
+df_2 %>%
+  rename("LifeExpectancy" = "Life expectancy",
+         "AdultMortality" = "Adult Mortality",
+         "InfantMortality" = "infant deaths",
+         "IncomeCompositionofResource" = "Income composition of resources")
+```
+
+```{r}
+# check missing values per col
+na_table <- 
+  df_2 %>%
+  is.na() %>%
+  colSums() %>%
+  data.frame() 
+
+colnames(na_table)[1] <- "count"
+na_table
+```
+
+```{r}
+# check duplicates
+df_2 %>%
+  duplicated() %>%
+  sum()
+```
+
+```{r}
+# automate EDA
+library(dataMaid)
+library(ExPanDaR)
+library(DataExplorer)
+library(dlookr)
+```
+
+
+```{r}
+create_report(df_2)
+```
+
+```{r}
+makeDataReport(df_2, output = "html")
+```
+
+```{r}
+eda_web_report(df_2,output_format = "html")
+```
+-   Correlation plot: https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html 
+
+-   Same: https://statsandr.com/blog/correlation-coefficient-and-correlation-test-in-r/
+

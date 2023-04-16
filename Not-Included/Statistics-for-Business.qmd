@@ -1,0 +1,92 @@
+---
+title: "Statistics for Business"
+format: html
+editor: visual
+---
+
+# 1 Stages
+
+## 1.1 Stage 1: Choose dataset
+
+-   Free to choose dataset
+-   Dataset should be a mixture of at least one numerical and one categorical variable
+-   Examples:
+    -   Research
+        -   Poverty analysis on household factors
+        -   National census survey analysis on internet access of individual in rural area
+    -   Business
+        -   Retail profit prediction
+        -   Customer revenue prediction
+        -   Productivity prediction of company employees
+
+## 1.2 Stage 2: Setting up problem
+
+-   Project goal
+
+-   Define statistical tool
+
+-   Define design of regression model
+
+## 1.3 Stage 3: Performing statistical test
+
+-   Perform hypothesis tests and/or confidence intervals based on your substantive questions of interests. You are asked to determine hypotheses, statistical tests, and significance level (\$\\alpha\$).
+
+## 1.4 Stage 4: Building regression model
+
+You can build some regression models in some phases:
+
+-   Fit a linear regression with a single predictor, graph the data along with the fitted line.
+
+-   Include multiple predictors and at least one interaction term.
+
+-   Fit a linear regression that includes transformation (if needed). Compare the results to the model you fit without transformation.
+
+Remember to interpret the estimated coefficients and their uncertainties (standard error, prediction interval) in each model based on your question interest. You can discuss the assumptions needed in the model based on your data to use it to make real-world inferences. Evaluate the models by visualizing the residual and interpret the r-squared value.
+
+## 1.5 Stage 5: Analyzing and interpreting the results
+
+-   Explain about the data, the source, the variables. Ensure the validity and reliability of the data. Check the data quality (missing values, duplicated data). How could you gather additional data, at least in theory, to address if some issues exist.
+
+-   Data exploration. Graph your data in the scatterplot or compute the linear correlation. gather insight from the distribution of data.
+
+-   Conduct statistical testing or confidence interval of statistics you want to infer, and analyze the result.
+
+-   Build regression model. Interpret the results: coefficients, standard error, prediction interval, and adjusted R-square.
+
+## 1.6 Stage 6: Making conclusions and recommendations
+
+-   Write conclusions from the analysis: How the result of a statistical test is, how regression analysis answers the relationships among variables, and predicts a particular data
+
+-   Recommendations for the business. When making recommendations, consider the context in the business and the limitations of the model and/or the data
+
+-   Recommendation for the next experiment. From the results if you want to do an improvement, what do you recommend?
+
+## 1.7 Stage 7: Make easy report and presentation
+
+# 2 Outcomes
+
+## 2.1 Code
+
+-   Upload to GitHub
+
+## 2.2 Easy report
+
+-   Format
+
+    -   Introduction
+
+    -   Dataset
+
+    -   Statistical test
+
+    -   Regression model
+
+    -   Concludion and recommendation
+
+    -   Reference
+
+-   Upload to Medium
+
+[RPubs - Regression Project Report](https://rpubs.com/jpgriesser/596586)
+
+====================================================================

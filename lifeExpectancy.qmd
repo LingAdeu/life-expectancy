@@ -1,0 +1,657 @@
+---
+title: "Life-Expectancy"
+author: "Adelia Januarto"
+format: html
+---
+
+```{r, warning=FALSE, message=FALSE}
+# import packages
+library(tidyverse, warn.conflicts = F)  # For data wrangling and visualization
+library(broom)                          # For displaying model result
+library(GGally)                         # For correlation matrix plot
+library(patchwork)                      # For combining plots
+library(ggtext)                         # For coloring text
+library(ggsignif)
+library(psych)
+library(ggpubr)
+```
+
+
+# 1 Introduction
+
+life expectancy, an estimated life span in a population, are affected by many multiple factors such as socioeconomic status, health condition, and lifestyle. But as each factor affects life expectancy differently, which factors are more likely to affect life expectancy remains an open question to answer. Regarding this issue, I will carry out a multiple regression analysis to see the relationship between life expectancy and several characteristics of countries. 
+
+But before before doing this statistical analysis, I will firstly undertake a short exploratory data analysis, particularly to understand the life expectancy rates as well as the correlations between the rates and other variables. My reason for doing a correlation analysis is that both regression and correlation seek relationship between variables. In regression, for instance, a slope informs the magnitude (size) and negative or positive direction of relationship between variables. 
+
+
+# 2 Dataset
+
+The dataset was taken from Kumar Ajarshi via [Kaggle](Source: https://www.kaggle.com/datasets/kumarajarshi/life-expectancy-who).
+
+```{r}
+# import dataset
+lifeExpectancyRaw <-
+  read_csv("datasets/life-expectancy.csv", 
+           # don't show col types
+           show_col_types = F)
+
+# convert col names
+names(lifeExpectancyRaw) <- 
+  names(lifeExpectancyRaw) %>% 
+  # into lowercase
+  tolower() %>%
+  # change space with period
+  make.names()
+
+# check dimension of raw dataset
+lifeExpectancyRaw %>% 
+  dim()
+```
+
+The raw dataset contains 2,938 records and 22 variables. 
+
+```{r}
+# drop irrelevant columns
+lifeExpectancyRaw <- 
+  lifeExpectancyRaw %>%
+  select(-c(country, year, percentage.expenditure, 
+            thinness_1to19years, thinness_5to9_years,
+            income.composition.of.resources))
+```
+
+
+```{r}
+# check duplicated rows
+lifeExpectancyRaw %>%
+  duplicated() %>%
+  sum()
+```
+
+```{r}
+# check missing values
+lifeExpectancyRaw %>%
+  is.na() %>%
+  sum()
+```
+Because the dataset contains missing values, I need to investigate further on which columns the missing values are.
+
+
+```{r}
+# get missing values by cols
+lifeExpectancyRaw %>%
+  is.na() %>%
+  colSums() %>%
+  data.frame() %>%
+  rename("count" = ".") %>%
+  arrange(desc(count))
+```
+
+Incomplete observations can be handled with, at least, two ways, namely deletion and imputation. But for practicalities and due to randomness of the incomplete cases, I discard the missing values instead of imputation. 
+
+```{r}
+# remove missing values
+lifeExpectancy <-
+  lifeExpectancyRaw %>%
+  na.omit() 
+
+# check dimension
+lifeExpectancy %>%
+  dim()
+```
+
+By removing incomplete cases, the dimension of the dataset now is 1649 rows and 16 columns. Kindly note that some columns were also intentionally removed due to practical reasons and relevance. For example, 
+
+As a consequence, below is the pre-processed dataset along with its short description for each variable.
+
+
+```{r}
+# display top-10 rows
+lifeExpectancy[1:10,1:9]
+```
+
+
+**Description**:
+
+-   `status`: country status based on income per capita (`Developing` and `Developed`)
+
+-   `life.expectancy`: a general life span rate of a population (between 44 and 89)
+
+-   `adult.mortality`: a death rate in adult population (M & F, 1 to 723)
+
+-   `infant.deaths`: a death rate in infant population (0 to 1600)
+
+-   `alcohol`: alcohol consumption per capita in liter (between 0.01 and 17.87)
+
+-   `hepatitisb`: hepatitis B immunization (in percentage)
+
+-   `measles`: a number of reported cases per 1000 people
+
+-   `bmi`: average of body mass index in the population
+
+-   `underfive_deaths`: number of toddlers (< 5 years old) per 1,000 people
+
+-   `polio`: polio immunization (%)
+
+-   `total.expenditure`: government expenditure on total expenditure
+
+-   `diphtheria`: diphteria tetanus tixoid and pertussis immunization (%)
+
+-   `hiv_aids`: death per 1000 patients
+
+-   `gdp`: gross domestic product per capita (USD)
+
+-   `schooling`: number of schooling duration (years)
+
+ 
+# 3 Data Exploration
+
+Before fitting the model, I will explore the dataset first by checking life expectancy as the dependent variable of this analysis and the correlations between life expectancy and other variables.
+
+```{r}
+options(dplyr.summarise.inform=F)
+p1 <- 
+  lifeExpectancy_copy %>% 
+  group_by(year, status) %>%
+  summarise(mean.life.expectancy=mean(life.expectancy)) %>%
+  ggplot(aes(x=year, y=mean.life.expectancy)) +
+  geom_line(na.rm = T, linewidth=1, aes(color=status)) +
+  scale_color_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + xlim(c(2000, 2020)) +
+  theme(axis.line=element_line(color="black"),
+        panel.grid.major=element_blank(),
+        legend.position = "none",
+        plot.title = element_text(size=10),
+        axis.title=element_text(size=9)) + 
+  annotate("text", x=2017, y=80.5, label="Developed", 
+           color="#fde725", size=2.9) +
+  annotate("text", x=2016.5, y=70.5, label="Developing",
+           color="#49be25", size=2.9) +
+  labs(title="Life expectancy over time",
+       x="Year", y="Mean of life expectancy")
+
+p2 <-
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=status)) +
+  geom_boxplot(aes(fill=status), width=0.5, outlier.colour="red") +
+  stat_signif(comparisons=list(c("Developing", "Developed")),
+              map_signif_level=T, test="t.test") +
+  coord_flip() + theme_minimal() +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme(legend.position = "none",
+        axis.line=element_line(color="black"),
+        plot.title=element_text(size=10),
+        axis.title = element_text(size=9)) +
+  labs(title="Status of countries",
+       x="Life expectancy", y="Status")
+
+p3 <- 
+  ggplot(lifeExpectancy, aes(x=life.expectancy)) +
+  geom_density(color="white", alpha=0.5, 
+               aes(fill=status, y=after_stat(density))) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  geom_vline(xintercept = median(lifeExpectancy$life.expectancy),
+             color="red", linetype="dashed") +
+  geom_vline(xintercept = mean(lifeExpectancy$life.expectancy),
+             color="blue", linetype="dashed") +
+  theme_minimal() + 
+  theme(axis.line = element_line(color="black"),
+        panel.grid.major=element_blank(),
+        plot.title=element_text(size=10),
+        axis.title=element_text(size=9),
+        legend.position="none") +
+  labs(title="Dist of life expectancy", 
+       x="Life expectancy",
+       y="Count")
+
+(p1 + p2 + p3) + 
+  plot_annotation(title = "Life expectancy in <span style='color:#fde725;'> 
+  developed </span> and <span style='color:#49be25;'> developing countries </span>",
+                  theme = theme(plot.title = element_markdown(lineheight = 1.1)))
+```
+
+Based on the exploration on `life.expectancy` variable, we can see developed and developing countries are considerably different in terms of life expectancy. From the line plot, for example, although both groups explicitly display similar  patterns, i.e., upward trends, the mean of life expectancy rate in developed countries are far higher than its developing counterparts. This raises a question whether a status of a country based on gross domestic products will affect much on life expectancy rate. 
+
+Moving on to the boxplots, the difference is also statistically significant (***), confirming the previous result that life expectancy rate seems to be highly influenced by developing-developed distinction whose classification is based on GDP. But it is important to note that outliers are present in the developing countries
+
+Furthermore, based on the density plots, both developing and developed countries indicate a similarity. Both country groups show left-skewed distribution, a condition in which the majority of data is concentrated on the right-hand side of distribution. This skewedness as a result suggests the non-normal distribution of life expectancy rates in developing and developed countries. 
+
+Now, let's see in greater details how are the patterns of life expectancy rates in developing and developed countries. 
+
+```{r}
+# import dataset
+lifeExpectancy_copy <-
+  read_csv("datasets/life-expectancy.csv", 
+           # don't show col types
+           show_col_types = F)
+
+# convert col names
+names(lifeExpectancy_copy) <- 
+  names(lifeExpectancy_copy) %>% 
+  # into lowercase
+  tolower() %>%
+  # change space with period
+  make.names()
+```
+
+
+
+```{r}
+p1 <- lifeExpectancy_copy %>%
+  select(c(status, country, life.expectancy)) %>%
+  group_by(status, country) %>%
+  summarise(mean_life.expectancy=mean(life.expectancy),
+            mean_life.expectancy=round(mean_life.expectancy, 3)) %>%
+  arrange(desc(mean_life.expectancy)) %>%
+  top_n(10, mean_life.expectancy) %>%
+  ggplot(aes(x=reorder(country, mean_life.expectancy), 
+             y=mean_life.expectancy, fill=status)) +
+  geom_point(size=3, shape=21, na.rm=T) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  labs(title="Highest life expectancy rates", 
+       x=NULL, y="Mean of life expectancy rate") +
+  theme_minimal() +
+  theme(axis.line=element_line(color="black"),
+        legend.position="bottom") +
+  coord_flip()
+
+p2 <- lifeExpectancy_copy %>%
+  select(c(status, country, life.expectancy)) %>%
+  group_by(status, country) %>%
+  summarise(mean_life.expectancy=mean(life.expectancy),
+            mean_life.expectancy=round(mean_life.expectancy, 3)) %>%
+  arrange(desc(mean_life.expectancy)) %>%
+  top_n(-10, mean_life.expectancy) %>%
+  ggplot(aes(x=reorder(country, mean_life.expectancy), 
+             y=mean_life.expectancy, fill=status)) +
+  geom_point(size=3, shape=21, na.rm=T) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  labs(title="Lowest life expectancy rates", 
+       x=NULL, y="Mean of life expectancy rate") +
+  theme_minimal() +
+  theme(axis.line=element_line(color="black"),
+        legend.position="bottom") +
+  coord_flip()
+
+p1 + p2 + 
+  plot_layout(guide="collect") & theme(legend.position="bottom")
+```
+
+Here we can see both developing and developed countries are present are present in the lowest and highest groups. Either in the lowest or highest groups, the patterns are similar. The life expectancy rates of developed countries are generally higher than those of developing ones. 
+
+
+Before moving on to regression analysis, let's discuss correlations between life expectancy rates and other variables. 
+
+```{r}
+p1 <- 
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=adult.mortality)) + 
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=65, 
+           label.y=600, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & adult mortality",
+       x= "Life expectancy", y="Adult mortality") +
+  theme(axis.line=element_line(color="black"),
+        legend.position="none",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9))
+
+p2 <- 
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=infant.deaths)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=68, 
+           label.y=1300, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & infant deaths",
+       x= "Life expectancy", y="Infant deaths") +
+  theme(axis.line=element_line(color="black"),
+        legend.position="right",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9)) +
+  guides(fill=guide_legend(title="Status"))
+
+p3 <-
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=alcohol)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=45, 
+           label.y=15, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & alcohol",
+       x= "Life expectancy", y="Alcohol consumption") +
+  theme(axis.line=element_line(color="black"),
+        legend.position="none",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9))
+
+p4 <-
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=hepatitisb)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=70, 
+           label.y=120, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & hepatitis B",
+       x= "Life expectancy", y="Hepatitis B") +
+  theme(axis.line=element_line(color="black"),
+        legend.position = "none",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9))
+
+(p1 | p2) / (p3 | p4) + 
+  plot_annotation(title="Life expectancy acros variables (Part I)")
+```
+
+
+```{r}
+p1 <- 
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=measles)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=45, 
+           label.y=125000, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & measles",
+       x= "Life expectancy", y="Measles (per 1K)") +
+  theme(axis.line=element_line(color="black"),
+        legend.position = "none",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9)) +
+  scale_y_continuous(labels=scales::comma)
+
+p2 <- 
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=bmi)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=25, 
+           label.y=70, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & BMI",
+       x= "Life expectancy", y="BMI") +
+  theme(axis.line=element_line(color="black"),
+        legend.position = "right",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9)) +
+  guides(fill=guide_legend(title="Status"))
+
+p3 <- 
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=underfive_deaths)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=68, 
+           label.y=1750, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & underfive deaths",
+       x= "Life expectancy", y="Underfive deaths (per 1K)") +
+  theme(axis.line=element_line(color="black"),
+        legend.position = "none",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9)) +
+  scale_y_continuous(labels=scales::comma)
+
+p4 <-
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=polio)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=70, 
+           label.y=25, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & polio",
+       x="Life expectancy", y="Polio immunization (%)") +
+  theme(axis.line=element_line(color="black"),
+        legend.position = "none",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9)) 
+
+(p1 | p2) / (p3 | p4) + 
+  plot_annotation(title="Life expectancy acros variables (Part II)")
+```
+
+
+```{r}
+# fig.height=6, fig.width=7.5
+p1 <-
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=total.expenditure)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=70, 
+           label.y=17, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & total expenditure",
+       x= "Life expectancy", y="Total expenditure (%)") +
+  theme(axis.line=element_line(color="black"),
+        legend.position = "none",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9)) 
+
+p2 <-
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=diphtheria)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=72, 
+           label.y=35, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & diphtheria",
+       x= "Life expectancy", y="Diphtheria") +
+  theme(axis.line=element_line(color="black"),
+        legend.position = "right",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9)) +
+  guides(fill=guide_legend(title="Status"))
+
+p3 <-
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=hiv_aids)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=68, 
+           label.y=40, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & HIV/AIDS",
+       x= "Life expectancy", y="HIV/AIDS") +
+  theme(axis.line=element_line(color="black"),
+        legend.position = "none",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9),
+        panel.grid.minor=element_blank())
+
+p4 <-
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=gdp)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=40, 
+           label.y=100000, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & GDP",
+       x= "Life expectancy", y="GDP (in USD)") +
+  theme(axis.line=element_line(color="black"),
+        legend.position = "none",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9)) +
+  scale_y_continuous(labels=scales::comma)
+
+p5 <-
+  lifeExpectancy %>%
+  ggplot(aes(x=life.expectancy, y=schooling)) +
+  geom_point(aes(fill=status), color="black", shape=21) +
+  geom_smooth(method="lm", formula="y~x", se=F, color="red") +
+  stat_cor(method="pearson", p.accuracy=0.05, label.x=40, 
+           label.y=17, size=3) +
+  scale_fill_manual(values=c("#fde725",  "#49be25")) +
+  theme_minimal() + 
+  labs(title="Life expectancy & schooling",
+       x= "Life expectancy", y="Schooling (in years)") +
+  theme(axis.line=element_line(color="black"),
+        legend.position = "none",
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9))
+
+(p1 + p2) / (p3 + p4) / (p5 + plot_spacer()) +
+  plot_annotation(title="Life expectancy acros variables (Part III)")
+```
+
+The `life.expectancy` shows a strong correlation with `adult.mortality` and `schooling` but the directions of the correlations are different. While the relationship between `life.expectancy` and `adult.mortality` is strongly negative (R=-0.70, p < 0.05), `life.expectancy` and `schooling` indicate a positive relationship (R=0.73, p < 0.05). This is not surprising as first, higher mortality rate indicates a higher number of death which in turn lowers life expectancy. Secondly, higher education increases better access to health information. Higher health literacy normally will lead to higher life expectancy. 
+
+# 4 Correlation
+
+
+```{r}
+# get Pearson's correlation coefficients
+lifeExpectancy %>%
+  # choose numeric cols only
+  select_if(is.numeric) %>%
+  # use Pearson's r
+  cor(method="pearson") %>%
+  # convert result into data frame
+  data.frame() %>%
+  # round results
+  mutate(life.expectancy=round(life.expectancy, 3),
+         adult.mortality=round(adult.mortality, 3),
+         infant.deaths=round(infant.deaths, 3),
+         alcohol=round(alcohol, 3),
+         hepatitisb=round(hepatitisb, 3),
+         measles=round(measles, 3),
+         bmi=round(bmi, 3),
+         underfive_deaths=round(underfive_deaths, 3),
+         polio=round(polio, 3),
+         total.expenditure=round(total.expenditure, 3),
+         diphtheria=round(diphtheria, 3),
+         hiv_aids=round(hiv_aids, 3),
+         gdp=round(gdp, 3),
+         population=round(population, 3),
+         schooling=round(schooling, 3))
+```
+
+# 5 Fit the model 
+
+```{r}
+# fit the model
+model <- 
+  lm(life.expectancy~., data=lifeExpectancy)
+```
+
+
+```{r}
+summary(model)
+```
+
+
+
+```{r}
+# print model
+tidy(model) %>%
+  mutate(estimate=round(estimate, 5),
+         std.error=round(std.error, 5),
+         statistic=round(statistic, 5),
+         p.value=round(p.value, 5))
+```
+
+> TO INTERPRET THE COEFFICIENT OF A LINEAR REGRESSION MODEL"
+> - Determine the sign of the coefficient: The positive or negative coefficient indicates the direction of the relationship between the dependent and independent variables. Positive = dependent variable increases as the independent variable increases.
+> - Determine the magnitude of the coefficient: strength of the relationship between dependent and independent variables. larger magnitude of the coefficient, the greater effect of the independent variable on the dependent one.
+>- Check statistical significance: tells whether the relationship between dependent and independent variable is likely to be real or due to chance. Significant = low probability that the relationship is due to chance. 
+
+
+-   The intercept of the regression line is 55. This value represents the predicted life expectancy rate with zero unit of predictors. 
+
+-   Because a standard error informs us about the variability of regression estimates, the low SEs above suggest the estimates are more precise. 
+
+-   As shown by the $R^2$ below, 82% of variance can be explained by the predictors. It means that the performance of the model is good.
+
+```{r}
+# get associated stats
+glance(model) %>%
+  select(r.squared, adj.r.squared)
+```
+
+
+```{r}
+# residual plot
+p1 <- model %>%
+  ggplot(aes(x=.fitted, y=.resid)) +
+  geom_point(shape=21, color="black", fill="#ff0000") + 
+  geom_hline(yintercept=0, color="blue", linetype="dashed") +
+  labs(title="Residuals vs. fitted values",
+       x="Fitted values", y="Residuals") + 
+  theme_minimal() +
+  theme(panel.grid.major=element_blank(),
+        axis.line=element_line(color="black"),
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9))
+
+# histogram of residuals
+p2 <- model %>%
+  ggplot(aes(x=.resid, y=after_stat(density))) +
+  geom_histogram(color="black", fill="#ff0000", bins=30) +
+  geom_vline(xintercept = mean(model$residuals), 
+             color="blue", linetype="dashed") +
+  geom_vline(xintercept = median(model$residuals),
+             color="green", linetype="dashed") +
+  theme_minimal() +
+  theme(panel.grid.major=element_blank(),
+        axis.line=element_line(color="black"),
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9)) +
+  labs(title="Distribution of residuals",
+       x="Residuals")
+
+p3 <- model %>%
+  ggplot(aes(sample=.resid)) + 
+  stat_qq(shape=21, fill="red", size=2) + 
+  stat_qq_line(color="blue") +
+  labs(title="Residual vs. normal dist", 
+       x="Theoretical quantiles", 
+       y="Sample quantiles") +
+  theme_minimal() +
+  theme(axis.line=element_line(color="black"),
+        panel.grid.major=element_blank(),
+        plot.title=element_text(size=11),
+        axis.title=element_text(size=9))
+
+p1 + p2 + p3 + 
+  plot_annotation(title="Evaluation of the linear regression model")
+```
+
+These plots summarize the performance of the linear regression model. 
+
+-   First, the residual plot visualizes the discrepancy between predicted vs residual values. The general rule is that when a model performs well, there should be no patterns or trends seen on the plot. And here, because no striking patterns can be seen, the model is a good fit for the data. 
+
+-   Second, the histogram of residuals suggests a normal distribution of the residuals as seen from the bell-shaped tendency.
+
+-   Third, the Q-Q plot comparing the theoretical (normal) distribution and residuals shows a normal distribution as the points are close to the diagonal line. 
+
+
+
+
+
+
+
+
+
+
+
+
