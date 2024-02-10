@@ -1,1 +1,1 @@
-# Life-Expectancy
+This project aims to understand which factors in the dataset have the strongest effects of life expectancy. For the report, kindly visit my Medium page [here](https://medium.com/@lingostat/exploring-factors-affecting-life-expectancy-a-multiple-regression-analysis-ae92f071e535)
